@@ -1,0 +1,50 @@
+{
+  "name": "buddy",
+  "version": "0.2.0",
+  "description": "The Claude Code Buddy cat, back above the prompt as a mod. Needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
+  "author": {
+    "name": "Clint Shryock"
+  },
+  "homepage": "https://github.com/catsby/claude-code-buddy",
+  "repository": "https://github.com/catsby/claude-code-buddy",
+  "license": "MIT",
+  "keywords": [
+    "buddy",
+    "pet",
+    "ascii",
+    "function-hooks",
+    "mod"
+  ],
+  "userConfig": {
+    "color": {
+      "type": "string",
+      "title": "Sprite color",
+      "description": "A hex string or a terminal color name.",
+      "default": "#7acf7a"
+    },
+    "heartColor": {
+      "type": "string",
+      "title": "Heart color",
+      "description": "The hearts /buddy pet floats above the sprite.",
+      "default": "#a7a6fd"
+    },
+    "restMs": {
+      "type": "number",
+      "title": "Rest (ms)",
+      "description": "How long the cat sits still between flicks.",
+      "default": 2600
+    },
+    "flickMs": {
+      "type": "number",
+      "title": "Flick (ms)",
+      "description": "How long a tail or ear flick is held.",
+      "default": 400
+    },
+    "showName": {
+      "type": "boolean",
+      "title": "Show name",
+      "description": "Draw the buddy's name under the sprite.",
+      "default": true
+    }
+  }
+}

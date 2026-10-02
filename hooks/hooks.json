@@ -1,0 +1,4 @@
+{
+  "description": "Draws the buddy in the band above the prompt; builds without function hooks ignore the modules key.",
+  "modules": ["./register.tsx"]
+}

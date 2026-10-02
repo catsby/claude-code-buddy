@@ -1,0 +1,27 @@
+#!/usr/bin/env expect
+#
+# Draw the mod in a real terminal without a human at the keyboard: spawn Claude
+# Code under a PTY, let it sit, then quit. The captured escape stream shows
+# where the sprite landed and which cells repainted as the poses changed.
+#
+#   expect scripts/drive.exp [seconds] [logfile]
+#
+# Then read it back:
+#
+#   cat -v tui.log | grep -o '\[[0-9]*C\^\[\[[0-9]*B[^\r]*\[___\]'
+
+set seconds [expr {[llength $argv] > 0 ? [lindex $argv 0] : 15}]
+set logfile [expr {[llength $argv] > 1 ? [lindex $argv 1] : "tui.log"}]
+
+set timeout [expr {$seconds + 60}]
+log_file -noappend $logfile
+
+spawn -noecho env CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 TERM=xterm-256color \
+    claude --plugin-dir . --debug
+stty rows 40 columns 120 < $spawn_out(slave,name)
+
+sleep $seconds
+send "/quit\r"
+sleep 3
+send "\x03"
+expect eof

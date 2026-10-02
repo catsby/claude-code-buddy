@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": [
+      "es2023"
+    ],
+    "types": [
+      "claude-code"
+    ],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment",
+    "typeRoots": [
+      ".claude-plugin/types"
+    ]
+  },
+  "include": [
+    "hooks",
+    "tests"
+  ],
+  "exclude": [
+    "hooks/*.spec.ts"
+  ]
+}

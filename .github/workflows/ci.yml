@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sprite tests
+        run: node --experimental-strip-types --test 'hooks/*.spec.ts'
+
+      - name: Manifests parse
+        run: |
+          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json hooks/hooks.json; do
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" && echo "ok $f"
+          done
+
+# Typechecking and `claude plugin validate` are local steps, not CI ones: both
+# need declarations generated from an installed Claude Code build, and those are
+# pinned to a version rather than committed.

@@ -1,0 +1,48 @@
+#!/usr/bin/env expect
+#
+# Drive `/buddy pet` and capture the literal text grid at each heart state.
+#
+#   expect scripts/pet-grid.exp [outdir] [settle]
+#
+# Needs tmux. Read the positions back with:
+#
+#   perl -CSD -ne 'while(/([\x{2661}\x{00b7}])/g){ printf "%s@%d ", $1, pos($_)-1 }
+#                  print "\n" if /[\x{2661}\x{00b7}]/' <outdir>/g*.txt
+#
+# Use this, not the raw escape stream, to read where things landed: once the
+# engine starts repainting only the cells that changed, the stream shows the
+# diffs rather than the result, and the columns in it do not line up with the
+# screen. The grid does.
+#
+# Expect the sprite's column to be identical in all six captures, and the
+# hearts to sit at sprite-relative columns 0,3,7 then -1,3,6 then -2,1,8, then
+# -2,3,7 as dots, then to be gone.
+
+set outdir [expr {[llength $argv] > 0 ? [lindex $argv 0] : "."}]
+set settle [expr {[llength $argv] > 1 ? [lindex $argv 1] : 9}]
+set session buddygrid
+
+catch { exec tmux kill-session -t $session }
+exec tmux new-session -d -s $session -x 120 -y 40 \
+    "env CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir ."
+
+# Let the plugin load and the store read land, so the first capture holds the
+# sprite's resting column with no hearts anywhere near it.
+sleep $settle
+exec tmux capture-pane -p -t $session > $outdir/g0_before.txt
+
+exec tmux send-keys -t $session "/buddy pet" Enter
+# The states are held ~520ms each, so land a capture in the middle of each,
+# then one past the end. Boundaries are at 0, 520, 1023, 1543 and 2058ms.
+after 250
+exec tmux capture-pane -p -t $session > $outdir/g1.txt
+after 520
+exec tmux capture-pane -p -t $session > $outdir/g2.txt
+after 510
+exec tmux capture-pane -p -t $session > $outdir/g3.txt
+after 520
+exec tmux capture-pane -p -t $session > $outdir/g4_dots.txt
+after 700
+exec tmux capture-pane -p -t $session > $outdir/g5_after.txt
+
+catch { exec tmux kill-session -t $session }
