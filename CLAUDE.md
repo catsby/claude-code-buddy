@@ -130,13 +130,16 @@ module variable.
 - Right-align a multi-line block with an outer row `Box` (`justifyContent:
   'flex-end'`) wrapping an inner column `Box`. `alignItems: 'flex-end'` on the
   column would right-align each line *individually* and shear the sprite apart.
-- The engine paints its own collapse mark `[-]` over the band's right edge, so
-  the sprite is held `COLLAPSE_MARK_COLUMNS` clear of it.
+- `bodyColumns` already excludes the engine's collapse mark `[-]` (and, since
+  2.1.289, one column at the terminal's edge), so the sprite takes no margin of
+  its own. Before 2.1.289 the mark painted over the hat and the sprite was held
+  four columns clear.
 - Every row, the heart row included, is `SPECIES_WIDTH` (12) wide, and the
   hearts' reach (two left of the cat, one past it) falls inside it. So the
   column is one width whether or not hearts are showing, and the cat keeps its
   column when a pet starts and ends. Verified in a 120-column terminal: hat at
-  column 107 before, during and after a pet (`pet-grid.exp`).
+  column 106 before, during and after a pet (`pet-grid.exp` drives the pane
+  layout if that is the stored one; send `/buddy band` first).
 
 **Animation** is driven by `$.clock.after` chained to the next pose's hold time,
 not a frame-rate timer: one redraw per pose change, and the engine repaints only

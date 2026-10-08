@@ -158,14 +158,130 @@ describe('register', () => {
 
     const { text } = await $.command.run(Fixtures.buddy('Fetch'))
 
-    expect(text).toBe('/buddy takes on, off, pet, name <name>, roll or roll back (got "Fetch").')
+    expect(text).toBe('/buddy takes on, off, pet, pane, band, name <name>, roll or roll back (got "Fetch").')
+  })
+
+  describe('the side pane', () => {
+    /** The pane calls a plugin makes, and whether the terminal places it. */
+    const beneathPane = (on: Parameters<typeof Fixtures.beneathBuddy>[0], isPlaced: boolean) => {
+      const world = Fixtures.beneathBuddy(on)
+      const opened: { id: string; columns?: number }[] = []
+      const closed: string[] = []
+      on('ui.open', ($, e) => {
+        opened.push(e)
+        return { value: isPlaced ? { isPlaced: true } : { isPlaced: false, reason: 'narrow' } }
+      })
+      on('ui.close', ($, e) => {
+        closed.push(e.id)
+        return { value: undefined }
+      })
+      return { ...world, opened, closed }
+    }
+
+    test('/buddy pane opens the pane, remembers, and yields the band', async ($, on) => {
+      const { clock, store, opened } = beneathPane(on, true)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const band = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      const { text } = await $.command.run(Fixtures.buddy('pane'))
+
+      expect(text).toBe('Gristle moves to the side.')
+      expect(opened).toEqual([{ id: 'buddy', title: 'Gristle', columns: SPECIES_WIDTH + 2 }])
+      expect(store.get('layout')).toBe('pane')
+      expect(await Fixtures.rowsOf(band)).toEqual([ENGINE])
+    })
+
+    test('the docked pane draws the sprite and name, and no engine row', async ($, on) => {
+      const { clock } = beneathPane(on, true)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      await $.command.run(Fixtures.buddy('pane'))
+
+      const pane = await $.ui.mount({ plugin: 'buddy', ...Fixtures.PANE })
+
+      expect(await Fixtures.rowsOf(pane)).toEqual([...bodyLines('rest'), nameLine('Gristle')])
+    })
+
+    test('a terminal too narrow to dock keeps the buddy in the band', async ($, on) => {
+      const { clock, store } = beneathPane(on, false)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const band = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      const { text } = await $.command.run(Fixtures.buddy('pane'))
+
+      expect(text).toContain('stays in the band')
+      expect(store.get('layout')).toBe('pane')
+      expect(await Fixtures.rowsOf(band)).toEqual(REST)
+    })
+
+    test('/buddy band closes the pane and the band draws again', async ($, on) => {
+      const { clock, store, closed } = beneathPane(on, true)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const band = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await $.command.run(Fixtures.buddy('pane'))
+
+      const { text } = await $.command.run(Fixtures.buddy('band'))
+
+      expect(text).toBe('Gristle is back above the prompt.')
+      expect(closed).toEqual(['buddy'])
+      expect(store.get('layout')).toBe('band')
+      expect(await Fixtures.rowsOf(band)).toEqual(REST)
+    })
+
+    test('/buddy off closes the pane and /buddy on opens it again', async ($, on) => {
+      const { clock, opened, closed } = beneathPane(on, true)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      await $.command.run(Fixtures.buddy('pane'))
+
+      await $.command.run(Fixtures.buddy('off'))
+      expect(closed).toEqual(['buddy'])
+
+      await $.command.run(Fixtures.buddy('on'))
+      expect(opened).toHaveLength(2)
+    })
+
+    test('a pane that comes up inline is closed for the band', async ($, on) => {
+      const { clock, closed } = beneathPane(on, true)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      await $.command.run(Fixtures.buddy('pane'))
+
+      await $.ui.mount({
+        plugin: 'buddy',
+        ...Fixtures.PANE,
+        props: { ...Fixtures.PANE.props, placement: 'inline' },
+      })
+      await clock.advance(1)
+
+      expect(closed).toEqual(['buddy'])
+    })
+
+    test('a stored pane layout reopens the pane when the session starts', async ($, on) => {
+      const world = Fixtures.beneathBuddy(on, { layout: 'pane' })
+      const opened: string[] = []
+      on('ui.open', ($, e) => {
+        opened.push(e.id)
+        return { value: { isPlaced: true } }
+      })
+      on('ui.panes', () => ({ value: [] }))
+      on('ui.close', () => ({ value: undefined }))
+
+      await $.session.start(Fixtures.SESSION)
+      await world.clock.settle()
+
+      expect(opened).toEqual(['buddy'])
+    })
   })
 
   describe('the band is yielded', () => {
     const yields = {
       'to a survey': { hasSurvey: true },
       'when too short for the sprite': { maxRows: 5 },
-      'when too narrow for the sprite and the collapse mark': { bodyColumns: SPECIES_WIDTH + 3 },
+      'when too narrow for the sprite': { bodyColumns: SPECIES_WIDTH - 1 },
     }
     for (const [when, props] of Object.entries(yields)) {
       test(when, async ($, on) => {
@@ -194,7 +310,7 @@ describe('register', () => {
     })
   })
 
-  test('at exactly the sprite and the collapse mark, it draws', async ($, on) => {
+  test('at exactly the sprite width, it draws', async ($, on) => {
     const { clock } = Fixtures.beneathBuddy(on)
     await $.session.start(Fixtures.SESSION)
     await clock.settle()
@@ -202,7 +318,7 @@ describe('register', () => {
     const ui = await $.ui.mount({
       plugin: 'buddy',
       ...Fixtures.BAND,
-      props: { ...Fixtures.BAND.props, bodyColumns: SPECIES_WIDTH + 4, maxRows: 6 },
+      props: { ...Fixtures.BAND.props, bodyColumns: SPECIES_WIDTH, maxRows: 6 },
     })
 
     expect(await Fixtures.rowsOf(ui)).toEqual(REST)

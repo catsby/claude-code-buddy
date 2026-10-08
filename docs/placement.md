@@ -44,10 +44,13 @@ for that idiom.
 
 ## The collapse mark
 
-The engine draws the band's own collapse affordance, `[-]`, hard against the
-right edge and on top of whatever the hook put there. It overlapped the hat
-until the sprite was held four columns clear of it. Ctrl+X Ctrl+A collapses the
-band and hides the cat with it; that is the engine's control, not this plugin's.
+The engine draws the band's own collapse affordance, `[-]`, at the right edge.
+On 2.1.287 it overlapped the hat until the sprite was held four columns clear
+of it. Since 2.1.289 the band's `bodyColumns` excludes the mark and keeps one
+column in from the terminal's edge, so no margin is needed: measured on 2.1.295
+in 120 columns, the block ends at column 115 and `[-]` sits at 116. Ctrl+X
+Ctrl+A collapses the band and hides the cat with it; that is the engine's
+control, not this plugin's.
 
 ## The block is wider than the cat
 
@@ -57,12 +60,12 @@ those, two columns in. `/buddy pet` puts hearts two columns left of the cat and
 one past its right, which is table columns 0 through 10, so the heart row fits
 the same 12 and nothing needs a margin. Every row is one width, so
 right-alignment pins the block and the cat keeps its column whether or not
-hearts are showing: hat at column 107 in a 120-column terminal, before, during
+hearts are showing: hat at column 106 in a 120-column terminal, before, during
 and after a pet.
 
 This was an 11-wide block (the 8-column sprite plus margins for the hearts'
-reach) until the table landed. Moving to 12 shifted the cat one column left,
-from 108.
+reach) until the table landed. Moving to 12 shifted the cat one column left.
+Dropping the collapse-mark margin on 2.1.295 moved it four columns right.
 
 The `bodyColumns` guard is sized to the block, not the sprite. The heart row is
 dropped, rather than the whole band yielded, when `maxRows` cannot spare a

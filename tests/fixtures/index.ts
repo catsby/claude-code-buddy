@@ -2,6 +2,7 @@ export * from './band.ts'
 export * from './beneath.ts'
 export * from './beneath-buddy.ts'
 export * from './buddy.ts'
+export * from './pane.ts'
 export * from './rows-of.ts'
 export * from './session.ts'
 
