@@ -116,3 +116,50 @@ expect scripts/drive.exp   # spawn, wait, /quit
 
 A correct draw shows cursor moves to the right-hand column followed by the
 sprite rows, and then single-cell repaints as the poses change.
+
+## Wishlist: what the engine would need to let the buddy float
+
+The original buddy took no rows: it sat in the right gutter beside the prompt.
+Every seat a mod can hook either costs rows (`AbovePrompt`, an inline `Pane`),
+holds one line of text (`SessionMode`, `PromptHint`), or needs width to dock
+(`Pane`, from 110 columns). In order of fit, what would fix it:
+
+1. **A render site for the gutter beside the prompt** (say `BesidePrompt`),
+   right-anchored and level with the input. It takes columns, not rows. This is
+   where the original drew, speech bubble included.
+2. **An absolute child that paints outside its site's region.** `position:
+   "absolute"` already leaves the flow, but the engine clips it to the site's
+   region, so a one-row band cannot anchor a cat that floats above it.
+3. **Overlay rows that reserve no layout height.** A way to mark a site's rows
+   as drawn over the transcript rather than pushing it up.
+
+All three need engine support; a mod cannot work around the clipping.
+
+### Evidence: absolute children are clipped to the band (2.1.325 types)
+
+A throwaway plugin returned a one-row band with two absolute blocks:
+
+```tsx
+<Box flexDirection="column">
+  <Box>
+    <Text>BANDROW</Text>
+    <Box position="absolute" top={-5} right={0} flexDirection="column">
+      <Text>ABOVE0</Text>{/* ... through ABOVE4 */}
+    </Box>
+    <Box position="absolute" top={0} right={-8}><Text>PASTEDGE</Text></Box>
+  </Box>
+  {await next(e)}
+</Box>
+```
+
+Captured with `tmux capture-pane` at 120x40:
+
+- `ABOVE0` to `ABOVE4` (`top={-5}`) never appeared; the five rows above the
+  band were blank. Vertical overflow is clipped.
+- `PASTEDGE` (`right={-8}`) painted past the band's body, but only into the
+  columns the engine reserves for `[-]`, and was cut at the terminal edge.
+- Not tested: a block hanging below the band (`bottom={-N}`).
+
+What would falsify this: the same probe on a later build painting `ABOVE0` to
+`ABOVE4` above the band. Then the wishlist's second item has shipped, and the
+cat could use a one-row band instead of six.

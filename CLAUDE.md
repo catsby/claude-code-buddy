@@ -125,7 +125,7 @@ next draw or `/buddy`. Anything that must outlive a reload belongs in `$.store` 
 `$.state`, which also survives a reload but resets on `/clear`), not in a
 module variable.
 
-**Drawing rules** (see `docs/placement.md` for the full reasoning):
+**Drawing rules** (see `docs/placement.md` for the full reasoning, and its wishlist section for what the engine would need to let the buddy float):
 
 - Resolve elements per surface with `await $.ui.resolve(e)`; a module has no
   element globals.

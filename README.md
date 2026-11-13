@@ -55,6 +55,8 @@ This build has fourteen hookable render sites and none of them is that gutter,
 so it sits right-aligned in the band directly above the prompt instead: one row
 off, same silhouette. [docs/placement.md](docs/placement.md) has the reasoning,
 how the band is shared with other mods, and how to verify a drawing landed.
+The wishlist of engine changes that would let the buddy float again is in the
+same file, under "Wishlist".
 
 Ctrl+X Ctrl+A collapses the band and hides the buddy. That is Claude Code's
 control, not this plugin's.
