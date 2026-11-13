@@ -71,7 +71,7 @@ do not survive into the drawn tree; find rows by text.
 
 ## Architecture
 
-**`hooks/sprite.ts`**, **`hooks/hearts.ts`**, **`hooks/species.ts`**,
+**`hooks/sprite.ts`**, **`hooks/hearts.ts`**, **`hooks/presence.ts`**, **`hooks/rise.ts`**, **`hooks/species.ts`**,
 **`hooks/identity.ts`** and **`hooks/roll.ts`** — pure. Pose table, geometry,
 cadence clamping; heart states and the row they draw on; the eighteen species
 with their hats and eyes; who the buddy is; the original's odds for a new one
@@ -96,6 +96,27 @@ overrule it. The shape is not frozen until the plugin is published.
 Rarity is rolled (it gates the hat and names the roll message) but is never
 stored or drawn: `identityFrom` drops a stored `rarity`, so
 `identityFrom({ ...before, ...rolled })` is safe.
+
+`presence.ts` reads `rex session inspect --json` and steps the debounce (one
+unfocused poll leaves, two focused polls return; an unreadable answer changes
+nothing; `FAIL_LIMIT` unanswered polls in a row stop the polling and show the
+buddy, so a missing `rex` is spawned three times, not forever). `register.tsx` polls it with `$.process.run` every `POLL_MS`, chained
+so calls never overlap, only when `REX_SESSION` and `REX_BLOCK` are set. The
+result is the module variable `presence`, not stored and not `hidden`: `gone()`
+is `hidden || !presence.here`. Rex focus is per session, so two sessions can both
+read as focused. Verified on 2.1.325 / Rex 0.1.0-preview.15: `$.process.run` runs
+unprompted, about 40 ms a call.
+
+`rise.ts` is the arrival: `risenRows` is the first `shown` rows and nothing below them, so the crown
+draws first and the band grows a row at a time, pushing what is above it up
+(there is no padding: the band is as tall as what is drawn). `nextRise` counts
+0 to 5; at 0 nothing is drawn and the hooks yield to the engine's own band. The
+`rise` module variable is transient and never stored. It starts on the first
+`ensureRunning`, on `/buddy on` from hidden and on a presence arrival, and is
+dropped by `/buddy off`, the pane being closed and presence leaving. `riseMs` is
+0 to turn it off. The kit tests that assert a first draw run with `riseMs: 0`
+(the local `test` in `tests/register.test.ts` defaults it); the rise's own tests
+use the kit's `test` and the manifest's hold.
 
 **`hooks/register.tsx`** — five hooks:
 

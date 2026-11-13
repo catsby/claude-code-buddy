@@ -84,6 +84,24 @@ by name got a personality-driven reply.
 - `/buddy name <name>`: rename the buddy. A name is 1 to 12 characters and is
   rejected, never cut; every other trait is kept.
 
+### Beyond the original — built
+
+- **Following you in Rex.** In a Rex terminal (`REX_SESSION` and `REX_BLOCK`
+  set) the buddy hides when its pane is not the focused pane of its session's
+  active tab, and returns about two to four seconds after you focus it: it polls
+  `rex session inspect --json` every two seconds and needs two focused polls in
+  a row to come back. Outside Rex nothing is run. Rex reports focus per session,
+  not per screen, so a session you have left still reports its last pane, and two
+  sessions can both show a buddy; that is accepted. It reads Rex only: it costs
+  no tokens and reads nothing of the conversation. A failing `rex` changes
+  nothing, and three failures in a row stop the polling and show the buddy. `/buddy off` outranks it, and it stores nothing.
+
+- **Rising into view.** The buddy arrives a row at a time from behind the prompt, the crown first
+  (about 120 ms a row, so under a second) when a session starts, on `/buddy on`
+  after `/buddy off`, and on returning to its pane in Rex. The band is as tall
+  as what is drawn, so each step pushes what is above it up a row. `riseMs` in
+  `/config` sets the hold; 0 turns it off. Arrival only: leaving is instant.
+
 ### Restoring — planned
 
 - Stats: five, rolled with the buddy and stored in the identity. The card

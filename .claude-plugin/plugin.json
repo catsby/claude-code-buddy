@@ -40,6 +40,12 @@
       "description": "How long a tail or ear flick is held.",
       "default": 400
     },
+    "riseMs": {
+      "type": "number",
+      "title": "Rise (ms)",
+      "description": "How long each row is held as the buddy rises into view. 0 turns the rise off.",
+      "default": 120
+    },
     "showName": {
       "type": "boolean",
       "title": "Show name",

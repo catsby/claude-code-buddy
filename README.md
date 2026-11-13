@@ -45,6 +45,16 @@ eyes, and a hat above common), keeping its name. `/buddy roll back` undoes the
 last roll, once. `/buddy name <name>` renames the buddy (1 to 12 characters;
 a longer or blank name is refused, not cut).
 
+In a [Rex](https://www.superlogical.com/rex) terminal the buddy follows you: it
+hides in a pane you are not looking at and comes back a couple of seconds after
+you focus it. It asks Rex which pane has focus every two seconds; outside Rex it
+does nothing of the kind. Rex tracks focus per session, so two sessions can both
+show a buddy. `/buddy off` still wins.
+
+The buddy rises into view from behind the prompt, a row at a time, when a session starts, on `/buddy on`
+and on returning to a pane. The `riseMs` setting sets how long each row is held;
+0 turns it off.
+
 Built against Claude Code 2.1.285; checked on 2.1.287. The mod API is early access and changes
 between releases.
 

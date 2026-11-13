@@ -1,10 +1,22 @@
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect, mock, test as kitTest } from 'claude-code/testing'
 
 import { HEART_STEPS, heartHoldMs, heartRow } from '../hooks/hearts.ts'
+import { ARRIVE_AFTER, FAIL_LIMIT, POLL_MS } from '../hooks/presence.ts'
+import { RISE_MS, RISE_ROWS, risenRows } from '../hooks/rise.ts'
 import { GRISTLE, bonesOf, identityFrom } from '../hooks/identity.ts'
 import { SPECIES_WIDTH, spriteLines } from '../hooks/species.ts'
 import { FRAME_OF_POSE, nameLine, type Pose } from '../hooks/sprite.ts'
 import Fixtures from './fixtures/index.ts'
+
+/**
+ * Every test but the rise's own runs with the rise off, so a buddy is whole at
+ * its first draw; the rise tests use `kitTest` and the manifest's hold.
+ */
+const STILL = { options: { riseMs: 0 } }
+const test: typeof kitTest = (name, ...rest) =>
+  rest.length === 1
+    ? kitTest(name, STILL, rest[0])
+    : kitTest(name, { ...rest[0], options: { ...STILL.options, ...rest[0].options } }, rest[1])
 
 const ENGINE = 'engine band'
 /** Gristle in a pose, as the band draws the cat. */
@@ -515,6 +527,272 @@ describe('register', () => {
       await clock.settle()
 
       expect((await $.command.run(Fixtures.buddy('roll back'))).text).toBe('Nothing to roll back to.')
+    })
+  })
+
+  describe('following the person in Rex', () => {
+    const OTHER = 'block:elsewhere'
+    const gone = [ENGINE]
+
+    test('outside Rex nothing is run and the buddy stays', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const calls: string[][] = []
+      mock.env(on, {})
+      on('process.run', ($, e) => {
+        calls.push([...e.argv])
+        return { deny: 'not in Rex' }
+      })
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      await clock.advance(POLL_MS * 3)
+
+      expect(calls).toEqual([])
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    })
+
+    test('asks Rex about its own session, as JSON', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { calls } = Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+
+      expect(calls[0]).toEqual(['rex', 'session', 'inspect', Fixtures.REX_SESSION, '--json'])
+    })
+
+    test('stays while its pane is focused', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      await clock.advance(POLL_MS * 3)
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    })
+
+    test('leaves on the next poll after the focus moves, and returns after a moment', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state } = Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      state.focused = OTHER
+      await clock.advance(POLL_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual(gone)
+
+      state.focused = Fixtures.REX_BLOCK
+      for (let poll = 1; poll < ARRIVE_AFTER; poll++) {
+        await clock.advance(POLL_MS)
+        expect(await Fixtures.rowsOf(ui), `poll ${poll}`).toEqual(gone)
+      }
+      await clock.advance(POLL_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    })
+
+    test('a failing rex never hides the buddy', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state } = Fixtures.rexFocus(on)
+      state.fails = true
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      await clock.advance(POLL_MS * 3)
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    })
+
+    test('a failing rex is asked FAIL_LIMIT times, then left alone', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state, calls } = Fixtures.rexFocus(on)
+      state.fails = true
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+
+      await clock.advance(POLL_MS * (FAIL_LIMIT + 5))
+
+      expect(calls).toHaveLength(FAIL_LIMIT)
+    })
+
+    test('an answer in between resets the count', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state, calls } = Fixtures.rexFocus(on)
+      state.fails = true
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      // FAIL_LIMIT - 1 failures so far (the settle's poll and the ones after it).
+      await clock.advance(POLL_MS * (FAIL_LIMIT - 2))
+      state.fails = false
+      await clock.advance(POLL_MS)
+      state.fails = true
+
+      await clock.advance(POLL_MS * (FAIL_LIMIT + 5))
+
+      // The answer reset the count, so it took FAIL_LIMIT more failures to stop.
+      expect(calls).toHaveLength(FAIL_LIMIT - 1 + 1 + FAIL_LIMIT)
+    })
+
+    test('a failing rex leaves an away buddy away until it gives up, then shows it', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state } = Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await clock.advance(RISE_MS * RISE_ROWS)
+      state.focused = OTHER
+      await clock.advance(POLL_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual([ENGINE])
+
+      state.fails = true
+      await clock.advance(POLL_MS * (FAIL_LIMIT - 1))
+      expect(await Fixtures.rowsOf(ui), 'still away before the limit').toEqual([ENGINE])
+
+      await clock.advance(POLL_MS)
+      await clock.advance(RISE_MS * RISE_ROWS)
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    })
+
+    test('/buddy off holds whatever Rex says, and writes nothing for presence', async ($, on) => {
+      const { clock, store } = Fixtures.beneathBuddy(on)
+      const { state } = Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await $.command.run(Fixtures.buddy('off'))
+
+      state.focused = OTHER
+      await clock.advance(POLL_MS)
+      state.focused = Fixtures.REX_BLOCK
+      await clock.advance(POLL_MS * (ARRIVE_AFTER + 1))
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(gone)
+      expect([...store.keys()], 'only the off').toEqual(['hidden'])
+    })
+  })
+
+  describe('rising into view', () => {
+    const test = kitTest
+    /** The band `shown` rows into the rise: that many of the buddy's six rows, then the engine's. */
+    const risen = (shown: number) => [...risenRows(REST.slice(0, RISE_ROWS), shown), ENGINE]
+
+    /** Steps the rise one row at a time, asserting each frame, to a whole buddy. */
+    const climb = async (
+      clock: { advance: (ms: number) => Promise<void> },
+      ui: Parameters<typeof Fixtures.rowsOf>[0],
+    ) => {
+      for (let shown = 1; shown < RISE_ROWS; shown++) {
+        await clock.advance(RISE_MS)
+        expect(await Fixtures.rowsOf(ui), `${shown} rows`).toEqual(risen(shown))
+      }
+      await clock.advance(RISE_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
+    }
+
+    test('a new session starts with no rows and fills in from the top', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(risen(0))
+      await climb(clock, ui)
+    })
+
+    test('the crown draws first, alone, and each row after it is added below', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      await clock.advance(RISE_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual([REST[0], ENGINE])
+      await clock.advance(RISE_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual([REST[0], REST[1], ENGINE])
+    })
+
+    test('the band grows by one row at each step, then stops', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      for (let step = 0; step <= RISE_ROWS; step++) {
+        expect(await Fixtures.rowsOf(ui), `step ${step}`).toHaveLength(1 + Math.min(step, RISE_ROWS))
+        await clock.advance(RISE_MS)
+      }
+      await clock.advance(RISE_MS * 3)
+      expect(await Fixtures.rowsOf(ui)).toHaveLength(REST.length)
+    })
+
+    test('/buddy on after /buddy off rises again', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await clock.advance(RISE_MS * RISE_ROWS)
+      await $.command.run(Fixtures.buddy('off'))
+
+      await $.command.run(Fixtures.buddy('on'))
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(risen(0))
+      await climb(clock, ui)
+    })
+
+    test('/buddy off during a rise stops it', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await clock.advance(RISE_MS * 2)
+
+      await $.command.run(Fixtures.buddy('off'))
+      await clock.advance(RISE_MS * RISE_ROWS)
+
+      expect(await Fixtures.rowsOf(ui)).toEqual([ENGINE])
+    })
+
+    test('a stored off does not rise', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on, { hidden: true })
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      await clock.advance(RISE_MS * RISE_ROWS)
+
+      expect(await Fixtures.rowsOf(ui)).toEqual([ENGINE])
+    })
+
+    test('coming back to a pane in Rex rises, it does not just appear', async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      const { state } = Fixtures.rexFocus(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+      await clock.advance(RISE_MS * RISE_ROWS)
+      state.focused = 'block:elsewhere'
+      await clock.advance(POLL_MS)
+      expect(await Fixtures.rowsOf(ui)).toEqual([ENGINE])
+
+      // The polls are on a two second beat from the start: the next is at 2 * POLL_MS.
+      state.focused = Fixtures.REX_BLOCK
+      const elapsed = RISE_MS * RISE_ROWS + POLL_MS
+      await clock.advance(POLL_MS * (ARRIVE_AFTER + 1) - elapsed)
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(risen(0))
+      await climb(clock, ui)
+    })
+
+    test('riseMs 0 draws the whole buddy at once', { options: { riseMs: 0 } }, async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+
+      expect(await Fixtures.rowsOf(ui)).toEqual(REST)
     })
   })
 })

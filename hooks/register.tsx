@@ -20,6 +20,16 @@ import {
   type Identity,
 } from './identity.ts'
 import { describe, roll } from './roll.ts'
+import {
+  FAIL_LIMIT,
+  POLL_MS,
+  START,
+  isFocused,
+  stepFailures,
+  stepPresence,
+  type Presence,
+} from './presence.ts'
+import { RISE_MS, clampRise, nextRise, risenRows } from './rise.ts'
 
 /**
  * The pane's id, and the store key for where the buddy lives. 'band' is the
@@ -46,6 +56,22 @@ let inlineClosed = false
  */
 let bandCollapsed = false
 let armed = false
+/**
+ * Whether this pane is the one the person is looking at, in a Rex session. Not
+ * stored and not the same thing as `hidden`: /buddy off wins, and presence
+ * only ever hides a buddy that would otherwise show. Outside Rex it never
+ * leaves START, so the buddy behaves as it always did.
+ */
+let presence: Presence = START
+let watching = false
+/**
+ * How many rows of the buddy show while it rises into view (the crown first), or
+ * null when it is whole. Transient like a pet: never stored. A hold of 0 from
+ * /config turns the rise off.
+ */
+let rise: number | null = null
+let riseTimer: Timer | null = null
+let riseHold = RISE_MS
 /** The one store read, shared by every caller that arrives while it is in flight. */
 let loading: Promise<void> | null = null
 let cadence: Cadence = clampCadence(undefined, undefined)
@@ -61,9 +87,83 @@ let petTimer: Timer | null = null
 function armPoses($: EngineInterface) {
   $.clock.after(holdMs(poseAt(step), cadence), () => {
     step += 1
-    if (!hidden) $.ui.invalidate('ui.render')
+    if (!gone()) $.ui.invalidate('ui.render')
     armPoses($)
   })
+}
+
+function endRise() {
+  riseTimer?.cancel()
+  riseTimer = null
+  rise = null
+}
+
+/**
+ * The buddy rises from behind the prompt: the band grows a row at a time, the
+ * crown first. Every step is one redraw, chained like the poses. The first frame
+ * has no rows, and is drawn before the first hold.
+ */
+function startRise($: EngineInterface) {
+  endRise()
+  if (riseHold === 0) return
+  rise = 0
+  $.ui.invalidate('ui.render')
+  const tick = () => {
+    riseTimer = null
+    rise = nextRise(rise)
+    $.ui.invalidate('ui.render')
+    if (rise !== null) riseTimer = $.clock.after(riseHold, tick)
+  }
+  riseTimer = $.clock.after(riseHold, tick)
+}
+
+/** Whether the buddy is off the screen: sent away, or somewhere else in Rex. */
+function gone(): boolean {
+  return hidden || !presence.here
+}
+
+/**
+ * Follows the person between Rex panes. One `rex session inspect` per poll,
+ * chained on the last one finishing so slow calls never pile up; every failure
+ * reads as "unknown", which leaves the buddy as it was. Not in Rex (no
+ * `REX_SESSION` or `REX_BLOCK`), nothing is ever run. After `FAIL_LIMIT`
+ * unanswered polls in a row (no `rex` on the path, say) it stops asking and
+ * shows the buddy, so a broken Rex never leaves one hidden for good.
+ */
+async function watchPresence($: EngineInterface) {
+  const [session, block] = await Promise.all([
+    $.env.get('REX_SESSION').catch(() => undefined),
+    $.env.get('REX_BLOCK').catch(() => undefined),
+  ])
+  if (!session || !block) return
+  let failures = 0
+  const poll = async () => {
+    const ran = await $.process
+      .run(['rex', 'session', 'inspect', session, '--json'], { timeoutMs: 1500 })
+      .catch(() => undefined)
+    const focused = ran && ran.exitCode === 0 ? isFocused(ran.stdout, block) : undefined
+    failures = stepFailures(failures, focused)
+    if (failures >= FAIL_LIMIT) {
+      const wasAway = !presence.here
+      presence = START
+      if (wasAway && !hidden) {
+        startRise($)
+        $.ui.invalidate('ui.render')
+      }
+      return
+    }
+    const next = stepPresence(presence, focused)
+    const changed = next.here !== presence.here
+    presence = next
+    if (changed) {
+      // Arriving rises into view; leaving drops any rise half done.
+      if (presence.here && !hidden) startRise($)
+      else endRise()
+      if (!hidden) $.ui.invalidate('ui.render')
+    }
+    $.clock.after(POLL_MS, poll)
+  }
+  await poll()
 }
 
 function endPet() {
@@ -120,6 +220,11 @@ async function ensureRunning($: EngineInterface) {
   if (!armed) {
     armed = true
     armPoses($)
+    if (!hidden) startRise($)
+  }
+  if (!watching) {
+    watching = true
+    watchPresence($).catch(() => {})
   }
 }
 
@@ -156,6 +261,10 @@ function buddyRows(
     identity.color ?? (typeof options?.color === 'string' ? options.color : '#7acf7a')
   const heartColor = typeof options?.heartColor === 'string' ? options.heartColor : '#a7a6fd'
   const showName = options?.showName !== false
+  const sprite = spriteLines(bonesOf(identity), FRAME_OF_POSE[poseAt(step)])
+  // While the buddy rises only the rows reached so far are drawn, so the band
+  // grows a row at a time from the prompt.
+  const rows = risenRows(showName ? [...sprite, nameLine(identity.name)] : sprite, rise ?? Infinity)
   return [
     hearts ? (
       <Text key="sprite:hearts" color={heartColor} wrap="truncate-end">
@@ -164,14 +273,14 @@ function buddyRows(
     ) : null,
     // Every row, the hearts' included, is SPECIES_WIDTH wide, so the sprite
     // keeps its column whether or not the heart row is drawn.
-    ...spriteLines(bonesOf(identity), FRAME_OF_POSE[poseAt(step)]).map((line, i) => (
+    ...rows.slice(0, sprite.length).map((line, i) => (
       <Text key={`sprite:${i}`} color={color} wrap="truncate-end">
         {line}
       </Text>
     )),
-    showName ? (
+    showName && rows.length > sprite.length ? (
       <Text key="sprite:name" dimColor italic wrap="truncate-end">
-        {nameLine(identity.name)}
+        {rows[sprite.length]}
       </Text>
     ) : null,
   ]
@@ -184,6 +293,7 @@ function collapsedText(name: string): string {
 
 export const register: Register = (on, options) => {
   cadence = clampCadence(options?.restMs, options?.flickMs)
+  riseHold = clampRise(options?.riseMs)
 
   on('session.start', async ($, e, next) => {
     const r = await next(e)
@@ -216,6 +326,7 @@ export const register: Register = (on, options) => {
     if (verb === 'off') {
       hidden = true
       endPet()
+      endRise()
       await $.store.set('hidden', true)
       await closePane($)
       $.ui.invalidate('ui.render')
@@ -224,6 +335,7 @@ export const register: Register = (on, options) => {
     if (verb === 'on' || verb === '') {
       const wasHidden = hidden
       hidden = false
+      if (wasHidden) startRise($)
       await $.store.set('hidden', false)
       await openPane($)
       $.ui.invalidate('ui.render')
@@ -287,7 +399,7 @@ export const register: Register = (on, options) => {
     // The band is terminal-only, and a survey holding it outranks a cat.
     await ensureRunning($)
     bandCollapsed = e.props.isCollapsed
-    if (hidden || docked || e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
+    if (gone() || rise === 0 || docked || e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
     // Six rows of sprite plus whatever else draws; below that, yield the band.
     if (e.props.maxRows < 6 || e.props.bodyColumns < SPECIES_WIDTH) {
       return next(e)
@@ -327,6 +439,8 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     docked = true
+    // Away in Rex: the pane stays open and draws nothing until the person is back.
+    if (!presence.here || rise === 0) return next(e)
     const elements = await $.ui.resolve(e)
     const { Box } = elements
     const hearts = petStep === null ? null : heartRow(petStep)
@@ -344,6 +458,7 @@ export const register: Register = (on, options) => {
       hidden = true
       docked = false
       endPet()
+      endRise()
       await $.store.set('hidden', true)
       $.ui.invalidate('ui.render')
     }
