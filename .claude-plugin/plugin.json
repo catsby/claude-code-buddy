@@ -1,6 +1,6 @@
 {
   "name": "buddy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The Claude Code Buddy cat, back above the prompt as a mod. Needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
   "author": {
     "name": "Clint Shryock"
