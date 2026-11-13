@@ -39,6 +39,12 @@ let layout: Layout = 'band'
 let docked = false
 /** Set once an inline pane has been sent away, so one arrival closes it once. */
 let inlineClosed = false
+/**
+ * Whether the person has collapsed the band, as the last draw reported it. The
+ * engine owns that state and a mod cannot expand the band, so the only thing to
+ * do with it is say so when /buddy runs and nothing shows.
+ */
+let bandCollapsed = false
 let armed = false
 /** The one store read, shared by every caller that arrives while it is in flight. */
 let loading: Promise<void> | null = null
@@ -171,6 +177,11 @@ function buddyRows(
   ]
 }
 
+/** What /buddy says when the engine's collapsed band is the reason nothing shows. */
+function collapsedText(name: string): string {
+  return `${name} is here, but the band is collapsed. Press ctrl+x ctrl+a, or click the line above the prompt, to show it.`
+}
+
 export const register: Register = (on, options) => {
   cadence = clampCadence(options?.restMs, options?.flickMs)
 
@@ -216,6 +227,7 @@ export const register: Register = (on, options) => {
       await $.store.set('hidden', false)
       await openPane($)
       $.ui.invalidate('ui.render')
+      if (layout === 'band' && bandCollapsed) return { text: collapsedText(name) }
       return { text: wasHidden ? `${name} pads back in.` : `${name} is already here.` }
     }
     if (verb === 'pane') {
@@ -234,6 +246,7 @@ export const register: Register = (on, options) => {
       layout = 'band'
       await $.store.set(LAYOUT_KEY, 'band')
       await closePane($)
+      if (bandCollapsed && !hidden) return { text: collapsedText(name) }
       return { text: `${name} is back above the prompt.` }
     }
     const rename = /^name(?:\s+(.*))?$/is.exec(e.args.trim())
@@ -273,6 +286,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // The band is terminal-only, and a survey holding it outranks a cat.
     await ensureRunning($)
+    bandCollapsed = e.props.isCollapsed
     if (hidden || docked || e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
     // Six rows of sprite plus whatever else draws; below that, yield the band.
     if (e.props.maxRows < 6 || e.props.bodyColumns < SPECIES_WIDTH) {

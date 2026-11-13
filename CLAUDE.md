@@ -97,15 +97,21 @@ Rarity is rolled (it gates the hat and names the roll message) but is never
 stored or drawn: `identityFrom` drops a stored `rarity`, so
 `identityFrom({ ...before, ...rolled })` is safe.
 
-**`hooks/register.tsx`** — three hooks:
+**`hooks/register.tsx`** — five hooks:
 
 - `session.start` registers `/buddy` and kicks off the pose timer off the
   critical path (a store read here would hold the first prompt).
 - `command.run` on `{ command: 'buddy' }` serves `on`/`off`/`pet`/`roll`/`roll
-  back`. `on`/`off` persist `hidden`; `roll` writes `identity` and keeps the
+  back`/`band`/`pane`. `on`/`off` persist `hidden`; `band`/`pane` persist
+  `layout`; `roll` writes `identity` and keeps the
   buddy it replaced under `previous`, which `roll back` restores and deletes (one
   undo, not a history). A pet is transient module state and persists nothing.
 - `ui.render` on `{ component: 'AbovePrompt' }` draws the tree.
+- `ui.render` on `{ component: 'Pane' }` draws the buddy only when `layout` is
+  `pane` and the pane is docked. An inline pane (narrow terminal) is closed on
+  arrival so the band keeps the buddy.
+- `ui.close` treats the person closing the pane as `/buddy off`, so the stored
+  `hidden` flag and the pane don't disagree after a restart.
 
 **Module state survives nothing.** A hot reload (`--plugin-dir` watches the
 folder) re-evaluates the module, so every module variable starts over and the
@@ -126,7 +132,9 @@ module variable.
 - Compose, never replace: `{await next(e)}` goes in the returned tree so a second
   `AbovePrompt` mod still works.
 - Yield the band on `e.props.hasSurvey`, `e.surface !== 'terminal'`, or when
-  `maxRows`/`bodyColumns` cannot fit the sprite.
+  `maxRows`/`bodyColumns` cannot fit the sprite. `maxRows` is the space left
+  above the prompt (capped at half the terminal's rows in fullscreen), per the
+  types; `e.props.isCollapsed` says the band is hidden but is not read yet.
 - Right-align a multi-line block with an outer row `Box` (`justifyContent:
   'flex-end'`) wrapping an inner column `Box`. `alignItems: 'flex-end'` on the
   column would right-align each line *individually* and shear the sprite apart.

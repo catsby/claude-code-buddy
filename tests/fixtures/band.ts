@@ -11,6 +11,7 @@ export const BAND: RenderInput<'AbovePrompt'> = {
   viewport: { columns: 120, rows: 40, isFullscreen: true },
   props: {
     hasSurvey: false,
+    isCollapsed: false,
     isWorking: false,
     maxRows: 12,
     bodyColumns: 120,

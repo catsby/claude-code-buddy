@@ -77,6 +77,18 @@ describe('register', () => {
     expect((await $.command.run(Fixtures.buddy(''))).text).toBe('Gristle is already here.')
   })
 
+  test('/buddy says so when the person has collapsed the band', async ($, on) => {
+    const { clock } = Fixtures.beneathBuddy(on)
+    await $.session.start(Fixtures.SESSION)
+    await clock.settle()
+    const collapsed = { ...Fixtures.BAND, props: { ...Fixtures.BAND.props, isCollapsed: true } }
+    await $.ui.mount({ plugin: 'buddy', ...collapsed })
+
+    const text = 'Gristle is here, but the band is collapsed. Press ctrl+x ctrl+a, or click the line above the prompt, to show it.'
+    expect((await $.command.run(Fixtures.buddy('on'))).text).toBe(text)
+    expect((await $.command.run(Fixtures.buddy('band'))).text).toBe(text)
+  })
+
   test('a stored off holds from the first draw', async ($, on) => {
     const { clock } = Fixtures.beneathBuddy(on, { hidden: true })
     await $.session.start(Fixtures.SESSION)

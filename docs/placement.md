@@ -6,8 +6,8 @@ exactly there, and this is the reasoning.
 
 ## The render sites a mod can hook
 
-`ui.render` fires per component instance, and `RenderComponent` in Claude Code
-2.1.273 is a closed list of fourteen:
+`ui.render` fires per component instance, and `RenderComponent` is a closed
+list. In 2.1.273 it held fourteen:
 
 ```
 AskUserQuestion  UserMessage  AssistantMessage  ToolUse  ToolResult
@@ -15,7 +15,9 @@ ToolGroup        CommandOutput  Spinner  TurnDuration  InfoNotice
 SessionMode      PromptHint     AbovePrompt  Pane
 ```
 
-None of them is that gutter. Of the fourteen, three sit near the prompt:
+The 2.1.325 types add `ToolProgress`, `AbovePromptList`, `Placed` (a row a mod
+put in the transcript with `$.ui.place`) and `Backdrop`. None of them is that
+gutter. Of the original fourteen, three sit near the prompt:
 
 - `SessionMode` — the dim mode labels at the right of the prompt footer. Right
   placed, but it is a list of label strings on one line.
@@ -32,10 +34,18 @@ same silhouette.
 The band belongs to whoever draws in it, so the hook yields rather than fights:
 
 - `e.props.hasSurvey` — a survey is holding the band; it outranks a cat.
-- `e.surface !== 'terminal'` — the band is terminal-only. Desktop, mobile and
-  VS Code have no equivalent.
+- `e.surface !== 'terminal'` — the mod yields everywhere but the terminal. The
+  2.1.325 types say the band is raised on terminal, desktop and mobile (not
+  VS Code), but this mod has only been measured in the terminal.
 - `e.props.maxRows` under the sprite's height, or `bodyColumns` too narrow —
-  not enough room to draw honestly, so draw nothing.
+  not enough room to draw honestly, so draw nothing. `maxRows` is, in
+  fullscreen, what the bottom slot has left above the prompt (that slot is
+  capped at half the terminal's rows, the prompt's included); otherwise the
+  terminal's height. A taller tree scrolls in a `scroll.bodyRows` window.
+- `e.props.isCollapsed` is true while the person has collapsed the band: a tree
+  still returns and none of it is on screen. The mod does not read it yet, so
+  the pose timer keeps redrawing into a hidden band. (The public docs say a mod
+  cannot detect collapse; the types say it can. The types are the authority.)
 
 It composes rather than replaces. Whatever another plugin drew comes back from
 `next(e)` and is kept below the cat, so a second `AbovePrompt` mod still works.
@@ -48,9 +58,26 @@ The engine draws the band's own collapse affordance, `[-]`, at the right edge.
 On 2.1.287 it overlapped the hat until the sprite was held four columns clear
 of it. Since 2.1.289 the band's `bodyColumns` excludes the mark and keeps one
 column in from the terminal's edge, so no margin is needed: measured on 2.1.295
-in 120 columns, the block ends at column 115 and `[-]` sits at 116. Ctrl+X
-Ctrl+A collapses the band and hides the cat with it; that is the engine's
-control, not this plugin's.
+in 120 columns, the block ends at column 115 and `[-]` sits at 116. The 2.1.325
+types state it as the column's width "less the engine's five at the right end".
+Ctrl+X Ctrl+A collapses the band and hides the cat with it; that is the
+engine's control, not this plugin's.
+
+## Pane seats
+
+A `Pane` is drawn in one of three seats, reported on its `placement` prop:
+`dock` beside the transcript (the terminal in fullscreen from 110 columns),
+`inline` above the prompt, and `widget`, the small form of a minimized pane on
+the desktop app only. A widget also carries `anchoredEdges` (which edges of the
+chat area it sits on; `[]` in the session rail); no call moves one. This mod
+treats `inline` as "not docked" and closes it, and anything else as docked,
+which matches the types' instruction to treat an unknown seat as `dock`.
+
+A pane the mod opens unasked (a timer, `turn.start`) is placed only from 144
+columns, or 110 once the person has opened that id. One the person asks for
+(`/buddy pane`) is placed at any width. `$.ui.open` resolves to `{ isPlaced,
+reason }`, and `isPromptCovered` (2.1.323, `Pane` only) is true while a dialog
+or field has the keyboard.
 
 ## The block is wider than the cat
 
