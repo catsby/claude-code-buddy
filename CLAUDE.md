@@ -97,7 +97,7 @@ Rarity is rolled (it gates the hat and names the roll message) but is never
 stored or drawn: `identityFrom` drops a stored `rarity`, so
 `identityFrom({ ...before, ...rolled })` is safe.
 
-`presence.ts` reads `rex session inspect --json` and steps the debounce (one
+The tag-along feature (README: "Tag-along (Rex)"): `presence.ts` reads `rex session inspect --json` and steps the debounce (one
 unfocused poll leaves, two focused polls return; an unreadable answer changes
 nothing; `FAIL_LIMIT` unanswered polls in a row stop the polling and show the
 buddy, so a missing `rex` is spawned three times, not forever). `register.tsx` polls it with `$.process.run` every `POLL_MS`, chained

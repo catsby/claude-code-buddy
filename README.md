@@ -45,15 +45,34 @@ eyes, and a hat above common), keeping its name. `/buddy roll back` undoes the
 last roll, once. `/buddy name <name>` renames the buddy (1 to 12 characters;
 a longer or blank name is refused, not cut).
 
-In a [Rex](https://www.superlogical.com/rex) terminal the buddy follows you: it
-hides in a pane you are not looking at and comes back a couple of seconds after
-you focus it. It asks Rex which pane has focus every two seconds; outside Rex it
-does nothing of the kind. Rex tracks focus per session, so two sessions can both
-show a buddy. `/buddy off` still wins.
+The buddy rises into view from behind the prompt, a row at a time, when a session
+starts, on `/buddy on` and, in Rex, on returning to a pane. The `riseMs` setting
+sets how long each row is held; 0 turns it off.
 
-The buddy rises into view from behind the prompt, a row at a time, when a session starts, on `/buddy on`
-and on returning to a pane. The `riseMs` setting sets how long each row is held;
-0 turns it off.
+### Tag-along (Rex)
+
+In a [Rex](https://www.superlogical.com/rex) terminal the buddy tags along: it
+hides in a pane you are not looking at and rises back a couple of seconds after
+you focus it, as if it followed you from tab to tab. It is a Rex feature only.
+Anywhere else the buddy simply stays where it is and nothing extra runs.
+
+- **What it needs.** Rex sets `REX_SESSION` and `REX_BLOCK` in every pane it
+  starts, and `rex` has to be on your `PATH`. With either variable missing the
+  plugin never calls `rex`.
+- **How it works.** Every two seconds the plugin runs `rex session inspect
+  --json` and checks whether its own pane is the focused pane of the session's
+  active tab. One look away and the buddy leaves; it takes two looks in a row to
+  come back, so a quick pass through a tab doesn't make it flicker. That lag is
+  the point.
+- **Per session.** Rex reports focus for each session, not for the screen. A
+  session you have left still reports its last focused pane, so two sessions can
+  both show a buddy. Moving between tabs and panes inside a session is what it
+  follows.
+- **When Rex is broken.** If `rex` can't be run or answers with something
+  unreadable three times in a row, the plugin stops asking for the rest of the
+  session and the buddy stays visible.
+- **Cost.** About 40 ms of `rex` every two seconds, no tokens, and nothing about
+  the conversation is read. `/buddy off` outranks it, and it stores nothing.
 
 Built against Claude Code 2.1.285; checked on 2.1.287. The mod API is early access and changes
 between releases.

@@ -86,7 +86,7 @@ by name got a personality-driven reply.
 
 ### Beyond the original — built
 
-- **Following you in Rex.** In a Rex terminal (`REX_SESSION` and `REX_BLOCK`
+- **Tag-along, in Rex.** In a Rex terminal (`REX_SESSION` and `REX_BLOCK`
   set) the buddy hides when its pane is not the focused pane of its session's
   active tab, and returns about two to four seconds after you focus it: it polls
   `rex session inspect --json` every two seconds and needs two focused polls in
@@ -94,7 +94,10 @@ by name got a personality-driven reply.
   not per screen, so a session you have left still reports its last pane, and two
   sessions can both show a buddy; that is accepted. It reads Rex only: it costs
   no tokens and reads nothing of the conversation. A failing `rex` changes
-  nothing, and three failures in a row stop the polling and show the buddy. `/buddy off` outranks it, and it stores nothing.
+  nothing, and three failures in a row stop the polling and show the buddy.
+  `/buddy off` outranks it, and it stores nothing. Rex users only, by design:
+  elsewhere the buddy stays put and nothing extra runs. The README documents it
+  for users as "Tag-along (Rex)".
 
 - **Rising into view.** The buddy arrives a row at a time from behind the prompt, the crown first
   (about 120 ms a row, so under a second) when a session starts, on `/buddy on`
