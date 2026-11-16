@@ -25,8 +25,7 @@ everything and stopping before them is the default.
 
 The version lives in one place: `.claude-plugin/plugin.json`. The marketplace
 entry (`.claude-plugin/marketplace.json`) has no version. Edit `"version"` and
-check nothing else carries the old number: `rg -F '<old version>' --glob '!.git'
---glob '!.claude/types'`.
+check nothing else carries the old number: `rg -F '<old version>' --glob '!.git'`.
 
 ## 3. Checks (all of them, in this order)
 
@@ -54,5 +53,4 @@ git tag v<version>
 git push && git push origin v<version>
 ```
 
-The repo has no tags yet, so `v0.2.0` is the first. Tag names are `v` plus the
-plugin version.
+Tag names are `v` plus the plugin version.

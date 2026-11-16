@@ -139,7 +139,7 @@ folder) re-evaluates the module, so every module variable starts over and the
 old environment's timers are dropped. Measured on 2.1.287 with a probe mod:
 the engine then raises `session.start` again for the reloaded mod, with module
 variables reset (the debug log says `session.start: raised for <mod> (loaded
-later)`). This file used to say it did not. `ensureRunning($)` is still
+later)`). `ensureRunning($)` is still
 called from the render and command hooks, now as a safety net: it re-arms the
 timer and re-reads `$.store` (one shared read, however many callers) on the
 next draw or `/buddy`. Anything that must outlive a reload belongs in `$.store` (or
@@ -161,8 +161,7 @@ module variable.
   column would right-align each line *individually* and shear the sprite apart.
 - `bodyColumns` already excludes the engine's collapse mark `[-]` (and, since
   2.1.289, one column at the terminal's edge), so the sprite takes no margin of
-  its own. Before 2.1.289 the mark painted over the hat and the sprite was held
-  four columns clear.
+  its own.
 - Every row, the heart row included, is `SPECIES_WIDTH` (12) wide, and the
   hearts' reach (two left of the cat, one past it) falls inside it. So the
   column is one width whether or not hearts are showing, and the cat keeps its
@@ -229,8 +228,9 @@ a fact confirmed in three of them is still one fact. Two rules:
 - **Credit a source when its work is in the repo**, in the header of the file
   that carries it and in README's Credits. A source that only confirmed
   something we already had does not need a credit; say so in the commit instead.
-  Do not list projects we merely looked at, or the credits stop meaning anything. Keep new glyphs sourced the same way and say which
-is which in the comment header.
+  Do not list projects we merely looked at, or the credits stop meaning anything.
+- Keep new glyphs sourced the same way: the comment header of the file that
+  carries them says which glyphs came from which source and which were measured.
 
 ## Naming
 
