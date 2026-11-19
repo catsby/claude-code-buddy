@@ -31,8 +31,8 @@
     "restMs": {
       "type": "number",
       "title": "Rest (ms)",
-      "description": "How long the cat sits still between flicks.",
-      "default": 2600
+      "description": "How long the cat sits still between flicks, on average. Each rest varies by a third of this either way: 15000 gives 10 to 20 seconds.",
+      "default": 15000
     },
     "flickMs": {
       "type": "number",

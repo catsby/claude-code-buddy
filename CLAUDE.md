@@ -171,7 +171,12 @@ module variable.
 
 **Animation** is driven by `$.clock.after` chained to the next pose's hold time,
 not a frame-rate timer: one redraw per pose change, and the engine repaints only
-the changed cells.
+the changed cells. The sequence is not fixed: `nextPose` settles a flick to
+rest and picks tail or ears at even odds, and `holdMs` jitters each rest by
+`REST_JITTER` (a third) either way. Both take the rng as an argument; the module
+passes `Math.random`. Plugin code runs with frozen globals, so a kit test
+cannot stub `Math.random`: the pose kit tests assert bounds instead, and every
+other kit test runs with a rest long enough that no flick lands mid-test.
 
 ## Debugging a drawing that does not appear
 

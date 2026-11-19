@@ -10,9 +10,11 @@ import Fixtures from './fixtures/index.ts'
 
 /**
  * Every test but the rise's own runs with the rise off, so a buddy is whole at
- * its first draw; the rise tests use `kitTest` and the manifest's hold.
+ * its first draw; the rise tests use `kitTest` and the manifest's hold. The
+ * rest is long enough that no random flick lands mid-test; the pose tests set
+ * their own.
  */
-const STILL = { options: { riseMs: 0 } }
+const STILL = { options: { riseMs: 0, restMs: 1_000_000 } }
 const test: typeof kitTest = (name, ...rest) =>
   rest.length === 1
     ? kitTest(name, STILL, rest[0])
@@ -44,31 +46,48 @@ describe('register', () => {
     expect(await Fixtures.rowsOf(ui)).toEqual(REST)
   })
 
-  test('the poses follow the clock: rest, tail, rest, ears', async ($, on) => {
-    const { clock } = Fixtures.beneathBuddy(on)
-    await $.session.start(Fixtures.SESSION)
-    await clock.settle()
-    const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+  // The plugin's Math.random cannot be stubbed from here, so the pose tests
+  // assert bounds: a long flick holds whichever end moved until it is read.
+  test(
+    'restMs from /config sets the rest, jittered by a third either way',
+    { options: { restMs: 2000, flickMs: 1_000_000 } },
+    async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
 
-    await clock.advance(2600)
-    expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('tail'))
-    await clock.advance(400)
-    expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('rest'))
-    await clock.advance(2600)
-    expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('ears'))
-  })
+      await clock.advance(1332)
+      expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('rest'))
+      await clock.advance(1335)
+      const flicked = (await Fixtures.rowsOf(ui)).slice(0, 5)
+      expect([bodyLines('tail'), bodyLines('ears')]).toContainEqual(flicked)
+    },
+  )
 
-  test('restMs from /config sets the rest', { options: { restMs: 1500 } }, async ($, on) => {
-    const { clock } = Fixtures.beneathBuddy(on)
-    await $.session.start(Fixtures.SESSION)
-    await clock.settle()
-    const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
+  test(
+    'a flick settles back to rest, and both ends get a turn',
+    { options: { restMs: 1000, flickMs: 80 } },
+    async ($, on) => {
+      const { clock } = Fixtures.beneathBuddy(on)
+      await $.session.start(Fixtures.SESSION)
+      await clock.settle()
+      const ui = await $.ui.mount({ plugin: 'buddy', ...Fixtures.BAND })
 
-    await clock.advance(1499)
-    expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('rest'))
-    await clock.advance(1)
-    expect((await Fixtures.rowsOf(ui)).slice(0, 5)).toEqual(bodyLines('tail'))
-  })
+      // Sampled every 40ms, so no 80ms flick is missed; 40s holds about 27 of
+      // them, and both ends turning up is a near certainty.
+      const seen = new Set<Pose>()
+      const poses: Pose[] = ['rest', 'tail', 'ears']
+      for (let t = 0; t < 40_000; t += 40) {
+        await clock.advance(40)
+        const rows = (await Fixtures.rowsOf(ui)).slice(0, 5)
+        const pose = poses.find((p) => JSON.stringify(bodyLines(p)) === JSON.stringify(rows))
+        expect(pose).toBeDefined()
+        seen.add(pose!)
+      }
+      expect([...seen].sort()).toEqual(['ears', 'rest', 'tail'])
+    },
+  )
 
   test('/buddy off yields the band and remembers; /buddy on undoes both', async ($, on) => {
     const { clock, store } = Fixtures.beneathBuddy(on)

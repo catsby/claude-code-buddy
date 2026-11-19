@@ -4,8 +4,10 @@ import {
   clampCadence,
   holdMs,
   nameLine,
-  poseAt,
+  nextPose,
   type Cadence,
+  type Pose,
+  type Rng,
 } from './sprite.ts'
 import { HEART_STEPS, heartHoldMs, heartRow } from './hearts.ts'
 import { SPECIES_WIDTH, spriteLines } from './species.ts'
@@ -41,7 +43,9 @@ const PANE = 'buddy'
 const LAYOUT_KEY = 'layout'
 type Layout = 'band' | 'pane'
 
-let step = 0
+let pose: Pose = 'rest'
+/** Read at each call, not captured, so a test can stub `Math.random`. */
+const random: Rng = () => Math.random()
 let hidden = false
 let identity: Identity = GRISTLE
 let layout: Layout = 'band'
@@ -82,11 +86,11 @@ let petTimer: Timer | null = null
 
 /**
  * Only two cells change between poses, so the timer fires on the change rather
- * than at a frame rate: four redraws a cycle, and the engine repaints the cells.
+ * than at a frame rate: two redraws a flick, and the engine repaints the cells.
  */
 function armPoses($: EngineInterface) {
-  $.clock.after(holdMs(poseAt(step), cadence), () => {
-    step += 1
+  $.clock.after(holdMs(pose, cadence, random), () => {
+    pose = nextPose(pose, random)
     if (!gone()) $.ui.invalidate('ui.render')
     armPoses($)
   })
@@ -261,7 +265,7 @@ function buddyRows(
     identity.color ?? (typeof options?.color === 'string' ? options.color : '#7acf7a')
   const heartColor = typeof options?.heartColor === 'string' ? options.heartColor : '#a7a6fd'
   const showName = options?.showName !== false
-  const sprite = spriteLines(bonesOf(identity), FRAME_OF_POSE[poseAt(step)])
+  const sprite = spriteLines(bonesOf(identity), FRAME_OF_POSE[pose])
   // While the buddy rises only the rows reached so far are drawn, so the band
   // grows a row at a time from the prompt.
   const rows = risenRows(showName ? [...sprite, nameLine(identity.name)] : sprite, rise ?? Infinity)

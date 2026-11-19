@@ -13,7 +13,7 @@ import {
   type Eye,
   type Hat,
 } from './species.ts'
-import { FRAME_OF_POSE, SPRITE_WIDTH, bodyLines, poseAt } from './sprite.ts'
+import { FRAME_OF_POSE, SPRITE_WIDTH, bodyLines, nextPose } from './sprite.ts'
 
 const EYE: Eye = '✦'
 const HATS = Object.keys(HAT_LINES) as Hat[]
@@ -111,8 +111,11 @@ test('the vendored cat is the cat we measured off the recording', () => {
   }
 })
 
-test('the pose cycle picks frames the table actually has', () => {
-  for (let step = 0; step < 8; step += 1) {
-    assert.ok(['rest', 'tail', 'ears'].includes(poseAt(step)))
+test('every pose the timer can reach is a frame the table actually has', () => {
+  for (const prev of ['rest', 'tail', 'ears'] as const) {
+    for (const v of [0, 0.5, 0.9999]) {
+      const frame = FRAME_OF_POSE[nextPose(prev, () => v)]
+      assert.ok(spriteLines({ species: 'cat', hat: 'tophat', eye: EYE }, frame).length > 0)
+    }
   }
 })

@@ -8,7 +8,9 @@
 // days later, shows `(")_(")~` outright. Both are kept out of the repo.
 //
 // The cadence is ours. The original's was measured later (CLAUDE.md, "Sprite
-// provenance") and differs: a blink as well as both flicks, on 500ms steps.
+// provenance") and differs: a blink as well as both flicks, on 500ms steps,
+// one about every 2.5s. Ours is deliberately slower and irregular: each rest
+// is jittered, and each flick is a coin toss between the tail and the ears.
 //
 // The band no longer draws `bodyLines`: it draws the vendored table in
 // species.ts, which is 12 columns wide and holds every species. These eight
@@ -40,14 +42,17 @@ const FEET: Record<Pose, string> = {
   ears: '(")_(")',
 }
 
-/**
- * Rest between flicks, and alternate which end moves: a cat that twitched the
- * same ear on a fixed beat would read as a spinner.
- */
-export const CYCLE: readonly Pose[] = ['rest', 'tail', 'rest', 'ears']
+/** A uniform draw in [0, 1), as `Math.random` gives. */
+export type Rng = () => number
 
-export function poseAt(step: number): Pose {
-  return CYCLE[((step % CYCLE.length) + CYCLE.length) % CYCLE.length]!
+/**
+ * The pose after `prev`. A flick always settles back to rest; a rest flicks
+ * the tail or the ears at even odds, so the same end can move twice running.
+ * A fixed beat, or a strict alternation, reads as a spinner rather than a cat.
+ */
+export function nextPose(prev: Pose, rng: Rng): Pose {
+  if (prev !== 'rest') return 'rest'
+  return rng() < 0.5 ? 'tail' : 'ears'
 }
 
 const pad = (line: string) => line.padEnd(SPRITE_WIDTH, ' ')
@@ -71,9 +76,17 @@ export function nameLine(name: string): string {
 
 export type Cadence = { restMs: number; flickMs: number }
 
-/** How long the current pose is held before the next one. */
-export function holdMs(pose: Pose, cadence: Cadence): number {
-  return pose === 'rest' ? cadence.restMs : cadence.flickMs
+/** How far a rest strays from `restMs` either way, as a fraction of it. */
+export const REST_JITTER = 1 / 3
+
+/**
+ * How long the current pose is held before the next one. A rest is drawn from
+ * `restMs` times [1 - REST_JITTER, 1 + REST_JITTER); a flick is held exactly
+ * `flickMs` and draws nothing from `rng`.
+ */
+export function holdMs(pose: Pose, cadence: Cadence, rng: Rng): number {
+  if (pose !== 'rest') return cadence.flickMs
+  return Math.round(cadence.restMs * (1 - REST_JITTER + 2 * REST_JITTER * rng()))
 }
 
 /**
@@ -84,7 +97,7 @@ export function clampCadence(restMs: unknown, flickMs: unknown): Cadence {
   const num = (v: unknown, fallback: number) =>
     typeof v === 'number' && Number.isFinite(v) ? v : fallback
   return {
-    restMs: Math.max(1000, num(restMs, 2600)),
+    restMs: Math.max(1000, num(restMs, 15000)),
     flickMs: Math.max(80, num(flickMs, 400)),
   }
 }

@@ -100,7 +100,10 @@ The hat, face and ear twitch were read frame by frame off a screen recording of
 the original. The tail flick never fires in those 6.7 seconds, but a screenshot
 of the same buddy taken days later shows it plainly. Both are kept out of the
 repo. The cadence is still ours, though the original's has since been measured
-off a longer recording: a blink and both flicks on a 7.5-second cycle.
+off a longer recording: a blink and both flicks on a 7.5-second cycle. Ours is
+slower and irregular: each rest is `restMs` (15 seconds by default) give or take
+a third, so 10 to 20 seconds, and each flick is a coin toss between the tail
+and the ears.
 
 ## Development
 
